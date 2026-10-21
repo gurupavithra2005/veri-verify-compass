@@ -15,6 +15,13 @@
       "when": 1792576670490,
       "tag": "0001_create_applications_and_status",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792576692029,
+      "tag": "0002_create_documents_verification_tables",
+      "breakpoints": true
     }
   ]
 }

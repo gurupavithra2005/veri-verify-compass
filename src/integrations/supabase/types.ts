@@ -152,6 +152,123 @@ export type Database = {
           },
         ]
       }
+      document_requirements: {
+        Row: {
+          active: boolean
+          created_at: string
+          description: string | null
+          document_category: string
+          id: string
+          required: boolean
+          requirement_name: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          document_category: string
+          id?: string
+          required?: boolean
+          requirement_name: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          created_at?: string
+          description?: string | null
+          document_category?: string
+          id?: string
+          required?: boolean
+          requirement_name?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          application_id: string
+          document_category: string
+          extracted_fields: Json | null
+          extracted_text: string | null
+          extraction_confidence: number | null
+          extraction_error: string | null
+          file_name: string
+          file_size: number
+          id: string
+          is_current: boolean
+          mime_type: string
+          ocr_status: string
+          pages_processed: number | null
+          sha256_hash: string | null
+          storage_path: string
+          updated_at: string
+          uploaded_at: string
+          uploaded_by: string
+          verification_status: string
+          version_number: number
+        }
+        Insert: {
+          application_id: string
+          document_category: string
+          extracted_fields?: Json | null
+          extracted_text?: string | null
+          extraction_confidence?: number | null
+          extraction_error?: string | null
+          file_name: string
+          file_size: number
+          id?: string
+          is_current?: boolean
+          mime_type: string
+          ocr_status?: string
+          pages_processed?: number | null
+          sha256_hash?: string | null
+          storage_path: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by: string
+          verification_status?: string
+          version_number?: number
+        }
+        Update: {
+          application_id?: string
+          document_category?: string
+          extracted_fields?: Json | null
+          extracted_text?: string | null
+          extraction_confidence?: number | null
+          extraction_error?: string | null
+          file_name?: string
+          file_size?: number
+          id?: string
+          is_current?: boolean
+          mime_type?: string
+          ocr_status?: string
+          pages_processed?: number | null
+          sha256_hash?: string | null
+          storage_path?: string
+          updated_at?: string
+          uploaded_at?: string
+          uploaded_by?: string
+          verification_status?: string
+          version_number?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           application_id: string | null
@@ -230,6 +347,45 @@ export type Database = {
         }
         Relationships: []
       }
+      report_history: {
+        Row: {
+          application_id: string
+          generated_at: string
+          generated_by: string | null
+          id: string
+          report_type: string
+        }
+        Insert: {
+          application_id: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          report_type?: string
+        }
+        Update: {
+          application_id?: string
+          generated_at?: string
+          generated_by?: string | null
+          id?: string
+          report_type?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_history_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_history_generated_by_fkey"
+            columns: ["generated_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       review_comments: {
         Row: {
           application_id: string
@@ -292,6 +448,152 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      verification_findings: {
+        Row: {
+          application_id: string
+          application_value: string | null
+          category: string
+          created_at: string
+          document_id: string | null
+          document_value: string | null
+          explanation: string
+          field_name: string | null
+          finding_status: string
+          id: string
+          recommended_action: string | null
+          resolution_comment: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          rule_code: string
+          severity: string
+          verification_run_id: string
+        }
+        Insert: {
+          application_id: string
+          application_value?: string | null
+          category: string
+          created_at?: string
+          document_id?: string | null
+          document_value?: string | null
+          explanation: string
+          field_name?: string | null
+          finding_status?: string
+          id?: string
+          recommended_action?: string | null
+          resolution_comment?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_code: string
+          severity?: string
+          verification_run_id: string
+        }
+        Update: {
+          application_id?: string
+          application_value?: string | null
+          category?: string
+          created_at?: string
+          document_id?: string | null
+          document_value?: string | null
+          explanation?: string
+          field_name?: string | null
+          finding_status?: string
+          id?: string
+          recommended_action?: string | null
+          resolution_comment?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          rule_code?: string
+          severity?: string
+          verification_run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_findings_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_findings_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_findings_resolved_by_fkey"
+            columns: ["resolved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_findings_verification_run_id_fkey"
+            columns: ["verification_run_id"]
+            isOneToOne: false
+            referencedRelation: "verification_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verification_runs: {
+        Row: {
+          application_id: string
+          checks_passed: number
+          checks_performed: number
+          completed_at: string | null
+          error_message: string | null
+          executed_by: string | null
+          findings_count: number
+          id: string
+          run_number: number
+          started_at: string
+          status: string
+        }
+        Insert: {
+          application_id: string
+          checks_passed?: number
+          checks_performed?: number
+          completed_at?: string | null
+          error_message?: string | null
+          executed_by?: string | null
+          findings_count?: number
+          id?: string
+          run_number: number
+          started_at?: string
+          status?: string
+        }
+        Update: {
+          application_id?: string
+          checks_passed?: number
+          checks_performed?: number
+          completed_at?: string | null
+          error_message?: string | null
+          executed_by?: string | null
+          findings_count?: number
+          id?: string
+          run_number?: number
+          started_at?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_runs_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "verification_runs_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {
