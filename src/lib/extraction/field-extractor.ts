@@ -62,11 +62,13 @@ function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   );
   const m = text.match(re);
   if (!m) return null;
-  // PDF text layers often join everything onto one line; stop the value at the
-  // next "Label:" pair so it doesn't swallow the rest of the document.
+  // The label pattern itself may contain capture groups; the value is always
+  // the LAST group. PDF text layers often join everything onto one line, so
+  // also stop the value at the next "Label:" pair.
+  const captured = m[m.length - 1];
   return (
-    m[1]
-      ?.split(/\s{3,}|\s+[A-Za-z][A-Za-z ]{0,60}:\s|\s+[A-Za-z][A-Za-z ]{0,60}:\s*$/)[0]
+    captured
+      ?.split(/\s{3,}|\s+[A-Za-z][A-Za-z ]{0,60}:\s/)[0]
       ?.trim() ?? null
   );
 }
