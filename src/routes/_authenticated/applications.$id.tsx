@@ -316,7 +316,7 @@ function ApplicationDetailPage() {
             requirements={reqs}
             currentDocs={currentDocs}
           />
-          {application.status !== "draft" && isOwner && (
+          {isOwner && EDITABLE_STATUSES.includes(application.status) && (
             <SubmitCard applicationId={applicationId} onSubmitted={invalidateAll} />
           )}
           {application.status !== "draft" && (
