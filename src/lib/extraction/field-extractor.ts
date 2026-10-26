@@ -55,6 +55,10 @@ export function parseDateText(raw: string): string | null {
   return null;
 }
 
+/** Known field labels used to trim values that swallowed following fields. */
+const NEXT_LABEL_SPLIT =
+  /\s{3,}|\s+(?:Institution\s+Registration\s+(?:Number|No\.?)|Application\s+(?:Reference\s+)?(?:Number|No\.?|ID)|Reference\s+(?:Number|No\.?)|Acknowledgment\s+(?:Number|No\.?)|Academic\s+Year|Session|Date\s+of\s+Issue|Issued?\s+(?:on|date)|Expiry\s+Date|Expires?\s+(?:on)?|Valid\s+(?:up\s*to|upto|till|until|for)|Certificate\s+(?:Number|No\.?)|Cert\.?\s*No\.?|College\s+Name|University\s+Name|Name\s+of\s+(?:the\s+)?Institution)\s*[:\-]/i;
+
 function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   const re = new RegExp(
     labelPattern.source + "[\\s:»\\-]*([^\\n]{1,120})",
@@ -64,13 +68,9 @@ function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   if (!m) return null;
   // The label pattern itself may contain capture groups; the value is always
   // the LAST group. PDF text layers often join everything onto one line, so
-  // also stop the value at the next "Label:" pair.
+  // stop the value at the next known field label.
   const captured = m[m.length - 1];
-  return (
-    captured
-      ?.split(/\s{3,}|\s+[A-Za-z][A-Za-z ]{0,60}:\s/)[0]
-      ?.trim() ?? null
-  );
+  return captured?.split(NEXT_LABEL_SPLIT)[0]?.trim() ?? null;
 }
 
 function pickLabeled(text: string, lines: string[], patterns: RegExp[]): string | null {
