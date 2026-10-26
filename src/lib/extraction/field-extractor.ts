@@ -62,7 +62,13 @@ function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   );
   const m = text.match(re);
   if (!m) return null;
-  return m[1]?.split(/\s{3,}|\s+[A-Z][a-z]+ [A-Z][a-z]+:/)[0]?.trim() ?? null;
+  // PDF text layers often join everything onto one line; stop the value at the
+  // next "Label:" pair so it doesn't swallow the rest of the document.
+  return (
+    m[1]
+      ?.split(/\s{3,}|\s+[A-Za-z][A-Za-z ]{0,60}:\s|\s+[A-Za-z][A-Za-z ]{0,60}:\s*$/)[0]
+      ?.trim() ?? null
+  );
 }
 
 function pickLabeled(text: string, lines: string[], patterns: RegExp[]): string | null {
