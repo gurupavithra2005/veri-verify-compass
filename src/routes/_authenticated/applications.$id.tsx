@@ -882,8 +882,8 @@ function DocumentsCard({
                     <History12 d={priorVersions} />
                   </p>
                 )}
-                {versions.length === 0 && null}
               </li>
+
             );
           })}
         </ul>
