@@ -566,6 +566,7 @@ function DocumentsCard({
   isStaff: boolean;
   onChanged: () => void;
 }) {
+  const { userId } = useSession();
   const [category, setCategory] = useState("");
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<string | null>(null);
@@ -1010,7 +1011,7 @@ function VerificationCard({
   onChanged,
 }: {
   applicationId: string;
-  verification: Awaited<ReturnType<typeof getVerificationResults>> | undefined;
+  verification: Awaited<ReturnType<typeof getVerificationResults>> | null | undefined;
   isPending: boolean;
   isStaff: boolean;
   onChanged: () => void;

@@ -14,8 +14,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { APPLICATION_STATUSES, STATUS_LABELS } from "@/lib/status";
-import { formatDate } from "@/lib/status";
+import { STATUS_LABELS, formatDate } from "@/lib/status";
+import { APPLICATION_STATUSES } from "@/lib/constants";
 
 export const Route = createFileRoute("/_authenticated/applications/")({
   head: () => ({
