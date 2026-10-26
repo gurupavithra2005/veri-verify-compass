@@ -788,10 +788,8 @@ function DocumentsCard({
       ) : (
         <ul className="space-y-3">
           {currentDocs.map((d) => {
-            const versions = docs.filter(
-              (v) => v.document_category === d.document_category && v.file_name !== d.file_name,
-            );
             const priorVersions = docs.filter((x) => !x.is_current && x.document_category === d.document_category);
+
             return (
               <li key={d.id} className="rounded-lg border bg-background p-3">
                 <div className="flex flex-wrap items-center justify-between gap-2">

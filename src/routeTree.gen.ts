@@ -21,6 +21,7 @@ import { Route as AuthenticatedNotificationsRouteImport } from './routes/_authen
 import { Route as AuthenticatedReviewRouteImport } from './routes/_authenticated/review'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
 import { Route as AuthenticatedApplicationsIndexRouteImport } from './routes/_authenticated/applications.index'
+import { Route as AuthenticatedApplicationsIdRouteImport } from './routes/_authenticated/applications.$id'
 import { Route as AuthenticatedApplicationsNewRouteImport } from './routes/_authenticated/applications.new'
 
 const IndexRoute = IndexRouteImport.update({
@@ -85,6 +86,12 @@ const AuthenticatedApplicationsIndexRoute =
     path: '/',
     getParentRoute: () => AuthenticatedApplicationsRoute,
   } as any)
+const AuthenticatedApplicationsIdRoute =
+  AuthenticatedApplicationsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => AuthenticatedApplicationsRoute,
+  } as any)
 const AuthenticatedApplicationsNewRoute =
   AuthenticatedApplicationsNewRouteImport.update({
     id: '/new',
@@ -103,6 +110,7 @@ export interface FileRoutesByFullPath {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/review': typeof AuthenticatedReviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/applications/$id': typeof AuthenticatedApplicationsIdRoute
   '/applications/new': typeof AuthenticatedApplicationsNewRoute
   '/applications/': typeof AuthenticatedApplicationsIndexRoute
 }
@@ -116,6 +124,7 @@ export interface FileRoutesByTo {
   '/notifications': typeof AuthenticatedNotificationsRoute
   '/review': typeof AuthenticatedReviewRoute
   '/settings': typeof AuthenticatedSettingsRoute
+  '/applications/$id': typeof AuthenticatedApplicationsIdRoute
   '/applications/new': typeof AuthenticatedApplicationsNewRoute
   '/applications': typeof AuthenticatedApplicationsIndexRoute
 }
@@ -132,6 +141,7 @@ export interface FileRoutesById {
   '/_authenticated/notifications': typeof AuthenticatedNotificationsRoute
   '/_authenticated/review': typeof AuthenticatedReviewRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/applications/$id': typeof AuthenticatedApplicationsIdRoute
   '/_authenticated/applications/new': typeof AuthenticatedApplicationsNewRoute
   '/_authenticated/applications/': typeof AuthenticatedApplicationsIndexRoute
 }
@@ -148,6 +158,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/review'
     | '/settings'
+    | '/applications/$id'
     | '/applications/new'
     | '/applications/'
   fileRoutesByTo: FileRoutesByTo
@@ -161,6 +172,7 @@ export interface FileRouteTypes {
     | '/notifications'
     | '/review'
     | '/settings'
+    | '/applications/$id'
     | '/applications/new'
     | '/applications'
   id:
@@ -176,6 +188,7 @@ export interface FileRouteTypes {
     | '/_authenticated/notifications'
     | '/_authenticated/review'
     | '/_authenticated/settings'
+    | '/_authenticated/applications/$id'
     | '/_authenticated/applications/new'
     | '/_authenticated/applications/'
   fileRoutesById: FileRoutesById
@@ -274,6 +287,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedApplicationsIndexRouteImport
       parentRoute: typeof AuthenticatedApplicationsRoute
     }
+    '/_authenticated/applications/$id': {
+      id: '/_authenticated/applications/$id'
+      path: '/$id'
+      fullPath: '/applications/$id'
+      preLoaderRoute: typeof AuthenticatedApplicationsIdRouteImport
+      parentRoute: typeof AuthenticatedApplicationsRoute
+    }
     '/_authenticated/applications/new': {
       id: '/_authenticated/applications/new'
       path: '/new'
@@ -285,12 +305,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AuthenticatedApplicationsRouteChildren {
+  AuthenticatedApplicationsIdRoute: typeof AuthenticatedApplicationsIdRoute
   AuthenticatedApplicationsNewRoute: typeof AuthenticatedApplicationsNewRoute
   AuthenticatedApplicationsIndexRoute: typeof AuthenticatedApplicationsIndexRoute
 }
 
 const AuthenticatedApplicationsRouteChildren: AuthenticatedApplicationsRouteChildren =
   {
+    AuthenticatedApplicationsIdRoute: AuthenticatedApplicationsIdRoute,
     AuthenticatedApplicationsNewRoute: AuthenticatedApplicationsNewRoute,
     AuthenticatedApplicationsIndexRoute: AuthenticatedApplicationsIndexRoute,
   }
