@@ -31,9 +31,8 @@ export function parseDateText(raw: string): string | null {
   const s = raw.trim().replace(/\s+/g, " ");
   // yyyy-mm-dd or yyyy/mm/dd
   const iso = s.match(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
-  if (iso) {
-    const [, y, m, d] = iso;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  if (iso && iso[1] && iso[2] && iso[3]) {
+    return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
   }
   // dd-mm-yyyy or dd/mm/yyyy
   const dmy = s.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b/);

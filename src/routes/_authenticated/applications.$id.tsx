@@ -600,6 +600,10 @@ function DocumentsCard({
   }
 
   async function onFileSelected(file: File) {
+    if (!userId) {
+      toast.error("You must be signed in to upload documents.");
+      return;
+    }
     if (!category) {
       toast.error("Select a document category first.");
       return;
