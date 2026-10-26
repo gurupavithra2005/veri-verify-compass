@@ -37,19 +37,18 @@ export function parseDateText(raw: string): string | null {
   }
   // dd-mm-yyyy or dd/mm/yyyy
   const dmy = s.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  if (dmy && dmy[1] && dmy[2] && dmy[3]) {
+    return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
   }
   // 12 March 2025 / March 12, 2025
   const textual = s.match(
     /\b(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b|\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/,
   );
   if (textual) {
-    if (textual[1]) {
+    if (textual[1] && textual[2] && textual[3]) {
       const m = MONTHS[textual[2].toLowerCase().slice(0, textual[2].length > 3 ? 3 : textual[2].length)];
       if (m) return `${textual[3]}-${m}-${textual[1].padStart(2, "0")}`;
-    } else {
+    } else if (textual[4] && textual[5] && textual[6]) {
       const m = MONTHS[textual[4].toLowerCase().slice(0, textual[4].length > 3 ? 3 : textual[4].length)];
       if (m) return `${textual[6]}-${m}-${textual[5].padStart(2, "0")}`;
     }
@@ -64,7 +63,7 @@ function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   );
   const m = text.match(re);
   if (!m) return null;
-  return m[1].split(/\s{3,}|\s+[A-Z][a-z]+ [A-Z][a-z]+:/)[0]?.trim() ?? null;
+  return m[1]?.split(/\s{3,}|\s+[A-Z][a-z]+ [A-Z][a-z]+:/)[0]?.trim() ?? null;
 }
 
 function pickLabeled(text: string, lines: string[], patterns: RegExp[]): string | null {
@@ -131,7 +130,7 @@ export function extractFields(text: string): ExtractedFields {
   const year = clean.match(
     /(?:academic\s*year|session|for\s+the\s+year)\s*[:\-–]?\s*(\d{4}\s*[-–/]\s*\d{2,4})/i,
   );
-  if (year) fields.academic_year = { value: year[1].replace(/\s/g, ""), confidence: 0.85 };
+  if (year && year[1]) fields.academic_year = { value: year[1].replace(/\s/g, ""), confidence: 0.85 };
 
   const issueRaw =
     pickLabeled(clean, lines, [

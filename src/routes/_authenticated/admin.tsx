@@ -8,7 +8,8 @@ import { StatusBadge } from "@/components/status-badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { APPLICATION_STATUSES, STATUS_LABELS } from "@/lib/status";
+import { STATUS_LABELS } from "@/lib/status";
+import { APPLICATION_STATUSES } from "@/lib/constants";
 
 export const Route = createFileRoute("/_authenticated/admin")({
   head: () => ({
