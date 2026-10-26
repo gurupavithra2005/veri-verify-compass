@@ -31,31 +31,33 @@ export function parseDateText(raw: string): string | null {
   const s = raw.trim().replace(/\s+/g, " ");
   // yyyy-mm-dd or yyyy/mm/dd
   const iso = s.match(/\b(\d{4})[-/.](\d{1,2})[-/.](\d{1,2})\b/);
-  if (iso) {
-    const [, y, m, d] = iso;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  if (iso && iso[1] && iso[2] && iso[3]) {
+    return `${iso[1]}-${iso[2].padStart(2, "0")}-${iso[3].padStart(2, "0")}`;
   }
   // dd-mm-yyyy or dd/mm/yyyy
   const dmy = s.match(/\b(\d{1,2})[-/.](\d{1,2})[-/.](\d{4})\b/);
-  if (dmy) {
-    const [, d, m, y] = dmy;
-    return `${y}-${m.padStart(2, "0")}-${d.padStart(2, "0")}`;
+  if (dmy && dmy[1] && dmy[2] && dmy[3]) {
+    return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
   }
   // 12 March 2025 / March 12, 2025
   const textual = s.match(
     /\b(\d{1,2})\s+([A-Za-z]{3,9})\.?,?\s+(\d{4})\b|\b([A-Za-z]{3,9})\.?\s+(\d{1,2}),?\s+(\d{4})\b/,
   );
   if (textual) {
-    if (textual[1]) {
+    if (textual[1] && textual[2] && textual[3]) {
       const m = MONTHS[textual[2].toLowerCase().slice(0, textual[2].length > 3 ? 3 : textual[2].length)];
       if (m) return `${textual[3]}-${m}-${textual[1].padStart(2, "0")}`;
-    } else {
+    } else if (textual[4] && textual[5] && textual[6]) {
       const m = MONTHS[textual[4].toLowerCase().slice(0, textual[4].length > 3 ? 3 : textual[4].length)];
       if (m) return `${textual[6]}-${m}-${textual[5].padStart(2, "0")}`;
     }
   }
   return null;
 }
+
+/** Known field labels used to trim values that swallowed following fields. */
+const NEXT_LABEL_SPLIT =
+  /\s{3,}|\s+(?:Institution\s+Registration\s+(?:Number|No\.?)|Application\s+(?:Reference\s+)?(?:Number|No\.?|ID)|Reference\s+(?:Number|No\.?)|Acknowledgment\s+(?:Number|No\.?)|Academic\s+Year|Session|Date\s+of\s+Issue|Issued?\s+(?:on|date)|Expiry\s+Date|Expires?\s+(?:on)?|Valid\s+(?:up\s*to|upto|till|until|for)|Certificate\s+(?:Number|No\.?)|Cert\.?\s*No\.?|College\s+Name|University\s+Name|Name\s+of\s+(?:the\s+)?Institution)\s*[:\-]/i;
 
 function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   const re = new RegExp(
@@ -64,7 +66,11 @@ function searchAfterLabel(text: string, labelPattern: RegExp): string | null {
   );
   const m = text.match(re);
   if (!m) return null;
-  return m[1].split(/\s{3,}|\s+[A-Z][a-z]+ [A-Z][a-z]+:/)[0]?.trim() ?? null;
+  // The label pattern itself may contain capture groups; the value is always
+  // the LAST group. PDF text layers often join everything onto one line, so
+  // stop the value at the next known field label.
+  const captured = m[m.length - 1];
+  return captured?.split(NEXT_LABEL_SPLIT)[0]?.trim() ?? null;
 }
 
 function pickLabeled(text: string, lines: string[], patterns: RegExp[]): string | null {
@@ -131,7 +137,7 @@ export function extractFields(text: string): ExtractedFields {
   const year = clean.match(
     /(?:academic\s*year|session|for\s+the\s+year)\s*[:\-–]?\s*(\d{4}\s*[-–/]\s*\d{2,4})/i,
   );
-  if (year) fields.academic_year = { value: year[1].replace(/\s/g, ""), confidence: 0.85 };
+  if (year && year[1]) fields.academic_year = { value: year[1].replace(/\s/g, ""), confidence: 0.85 };
 
   const issueRaw =
     pickLabeled(clean, lines, [

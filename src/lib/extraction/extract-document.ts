@@ -44,9 +44,11 @@ async function ocrBlob(blob: Blob): Promise<{ text: string; confidence: number |
   const worker = await Tesseract.createWorker("eng");
   try {
     const result = await worker.recognize(blob);
+    // Tesseract's typing for `data` varies across versions; read defensively.
+    const data = result.data as unknown as { text?: string; words?: { confidence: number }[] };
     return {
-      text: result.data.text ?? "",
-      confidence: averageConfidence(result.data.words ?? []),
+      text: data.text ?? "",
+      confidence: averageConfidence(data.words ?? []),
     };
   } finally {
     await worker.terminate();

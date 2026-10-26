@@ -514,7 +514,7 @@ export async function executeVerificationRun(opts: {
               .join(", ")}. A duplicate file does not prove fraud, but it should be checked.`,
             recommended_action:
               "Confirm that identical documents are intentional, or replace the duplicates with the distinct documents actually required.",
-            document_id: list[0].id,
+            document_id: list[0]?.id ?? null,
           }),
         );
       }

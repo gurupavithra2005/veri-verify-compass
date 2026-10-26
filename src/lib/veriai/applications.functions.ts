@@ -44,9 +44,19 @@ export const createApplication = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => applicationInputSchema.parse(input))
   .handler(async ({ data, context }) => {
+    // Normalize optional fields so undefined never reaches the generated insert type.
+    const payload = {
+      ...data,
+      institution_registration_number: data.institution_registration_number ?? null,
+      external_reference_number: data.external_reference_number ?? null,
+      description: data.description ?? null,
+      additional_notes: data.additional_notes ?? null,
+      created_by: context.userId,
+      status: "draft",
+    };
     const { data: created, error } = await context.supabase
       .from("applications")
-      .insert({ ...data, created_by: context.userId, status: "draft" })
+      .insert(payload)
       .select("id, application_number")
       .single();
     if (error) throw new Error("Could not save the application: " + error.message);
@@ -85,10 +95,12 @@ export const updateApplication = createServerFn({ method: "POST" })
     }
     const clean = Object.fromEntries(
       Object.entries(data.patch).filter(([, v]) => v !== undefined),
-    );
+    ) as Record<string, string | null>;
+    // Keys are whitelisted by the zod schema above; the cast satisfies the
+    // generated Update type's excess-property check for dynamic patches.
     const { error } = await context.supabase
       .from("applications")
-      .update(clean)
+      .update(clean as never)
       .eq("id", data.applicationId);
     if (error) throw new Error("Could not update the application: " + error.message);
     return { ok: true as const };
