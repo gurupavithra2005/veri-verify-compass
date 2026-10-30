@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { REQUIRED_APPLICATION_FIELDS } from "@/lib/constants";
 import { notifyUsers } from "./notifications.server";
+import { logAuditEvent } from "./audit.server";
 
 const applicationInputSchema = z.object({
   institution_name: z.string().min(1),
@@ -60,6 +61,14 @@ export const createApplication = createServerFn({ method: "POST" })
       .select("id, application_number")
       .single();
     if (error) throw new Error("Could not save the application: " + error.message);
+    await logAuditEvent({
+      applicationId: created.id,
+      actorId: context.userId,
+      actionType: "application_created",
+      entityType: "application",
+      entityId: created.id,
+      newValue: `draft ${created.application_number}`,
+    });
     return created;
   });
 
