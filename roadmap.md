@@ -1,23 +1,36 @@
-# VeriAI — Phase 1 Roadmap
+# VeriAI — SIH26261 Missing-Feature Implementation
 
-## Done
-- Lovable Cloud enabled (auth + Postgres + storage)
-- DB migrations: profiles, user_roles (+has_role/is_staff), applications, documents, document_requirements, verification_runs, verification_findings, application_status_history, review_comments, notifications, report_history + RLS + grants + triggers (profile on signup, application_number sequence VER-YYYY-NNNNNN, status-transition guard)
-- Private storage bucket `application-documents` + storage RLS (20 MB limit, path `{applicationId}/{file}`)
-- Email/password auth + forgot/reset password pages; email confirmation ON (test account: institution.test@qa.veriai.app, institution_user + admin for testing)
-- Design system (gov-tech navy/teal) + shared components (StatusBadge, AppShell sidebar, states)
-- Server functions: applications CRUD/submission (server-side required-field + required-document validation), documents replace/retire, verification engine (checks 1–8 incl. SHA-256 duplicates), findings resolution (staff), review workflow, admin assign/status/decision, notifications, PDF report (jsPDF + disclaimer)
-- Client OCR/extraction: pdfjs-dist (digital PDFs) + tesseract.js (images/scans), field extraction (labeled capture fixed to use last regex group + next-label trimming), SHA-256 hashing, confidence, page limits
-- Pages: landing (/), auth, dashboard, applications list, wizard, application detail (edit/upload/extract/replace/preview/verify/findings/resolve/comments/timeline/report), review queue, admin dashboard, notifications, settings
-- Build + typecheck green; vitest suite passes
-- E2E verified via Playwright: register → wizard → upload (2 categories) → extraction (95% conf) → server-side submission blocking on missing docs → submit → run verification (8 checks; matching-name run: 1 duplicate finding → manual_review; mismatch run: name mismatch + duplicate → action_required) → PDF report download verified (%PDF, correct contents)
+Constraints (standing):
+- Never modify VER-2026-000009 or VER-2026-000011 (audit evidence record, now Verified).
+- Never delete historical runs/findings/comments/notifications/report or status history.
+- Test only on clearly-labelled isolated TEST applications.
+- No weakening of auth/RLS/storage. No fabricated results. Findings stay advisory.
 
-## Remaining (not blockers)
-- [ ] Reviewer-specific flows exercised with a dedicated reviewer account (assigned queue, resolve findings in UI)
-- [ ] Replace-document version history asserted in UI test (server function verified)
-- [ ] README demo/test scenario walkthrough expansion
+## Phase A — Reliability (P0 defects)
+- [ ] A1 Fix field-extractor label pollution (P0) + regression tests
+- [ ] A2 Separate upload vs extraction status; working retry; no false success toasts
+- [ ] A3 Submission → automatic preliminary verification; duplicate-run guard; manual re-run kept
+- [ ] A4 Admin dashboard stats/list scope consistency
+- [ ] A5 Mobile overflow on application detail (~390px); write-error checks on comments/status/report/notifications
 
-## Notes
-- Roles: institution_user (default), reviewer, admin — stored in user_roles only, granted via trusted ops only.
-- Verification findings are "Potential Inconsistency — Manual Review Required"; never auto approve/reject.
-- Route rule: a pathless `_authenticated` layout must always have at least one child route, otherwise the router treats it as claiming "/" and conflicts with index.tsx.
+## Phase B — Verification completeness
+- [ ] B1 Per-field extraction evidence (value, source passage, method, confidence, correction state) persisted on documents
+- [ ] B2 Field corrections by owner (original retained + correction record)
+- [ ] B3 Document classification (document type detection) + cross-document consistency using real extracted fields
+- [ ] B4 Rule version + rules snapshot stored on each verification run
+- [ ] B5 Missing-field / expiry handling based on real data
+
+## Phase C — SIH-specific modules
+- [ ] C1 Authorized-source verification framework (admin-configured sources; real Not Configured state; SSRF-safe; evidence records)
+- [ ] C2 Institutional records registry (admin-managed, synthetic-demo-labelled) + engine comparison
+- [ ] C3 Anomaly/possible-tampering checks (PDF metadata, date heuristics, signature presence) — evidence-based, advisory
+- [ ] C4 Infrastructure evidence review (photo/video/floor-plan categories, evidence requests, inspection flag via review workflow)
+- [ ] C5 Complete audit trail table + logging + staff-visible audit view
+- [ ] C6 Dashboard/alert extensions + notifications for new events
+- [ ] C7 Extended PDF report (rules version, evidence, corrections, connector results, audit summary)
+
+## Phase D — Security & validation
+- [ ] D1 Migrations reviewable; RLS/grants on every new table
+- [ ] D2 Regression + e2e tests (Playwright) on isolated test application
+- [ ] D3 Mobile verification
+- [ ] D4 Implementation report with honest PASS/PARTIAL/BLOCKED/NOT TESTED statuses
