@@ -73,7 +73,20 @@ export function parseDateText(raw: string): string | null {
  * "Institution Registration Number" wins over "Registration Number".
  */
 const NEXT_LABEL_SPLIT =
-  /\s{3,}|\s*(?:Institution\s+Registration\s+(?:Number|No\.?)|Application\s+(?:Reference\s+)?(?:Number|No\.?|ID)|Registration\s+(?:Number|No\.?|Regd\.?)|Reference\s+(?:Number|No\.?)|Acknowledgment\s+(?:Number|No\.?)|Academic\s+Year|Session|Date\s+of\s+Issue|Date\s+of\s+Expiry|Issued?\s+(?:on|date)|Expiry\s+Date|Expires?\s+(?:on)?|Valid\s+(?:up\s*to|upto|till|until|for)|Certificate\s+(?:Number|No\.?)|Cert\.?\s*No\.?|Document\s+Type|College\s+Name|University\s+Name|Institution\s+Name|Name\s+of\s+(?:the\s+)?Institution|Name\s+of\s+(?:the\s+)?College)\s*[:\-]?/i;
+  /\s{3,}|\s*(?:Application\s+(?:Reference\s+)?(?:Number|No\.?|ID)|Registration\s+(?:Number|No\.?|Regd\.?)|Reference\s+(?:Number|No\.?)|Acknowledgment\s+(?:Number|No\.?)|Academic\s+Year|Session|Date\s+of\s+Issue|Date\s+of\s+Expiry|Issued?\s+(?:on|date)|Expiry\s+Date|Expires?\s+(?:on)?|Valid\s+(?:up\s*to|upto|till|until|for)|Certificate\s+(?:Number|No\.?)|Cert\.?\s*No\.?|Document\s+Type|College\s+Name|University\s+Name|Institution\s+Name|Name\s+of\s+(?:the\s+)?Institution|Name\s+of\s+(?:the\s+)?College)\s*[:\-]?/i;
+
+/**
+ * ID-like values (registration/reference/certificate numbers) must not
+ * swallow the sentence that follows them on a joined PDF line. A run of four
+ * or more plain words is prose, not part of an identifier — cut there.
+ */
+function trimProse(value: string): string {
+  const proseStart = value.match(/\s+[A-Za-z]{2,}(?:\s+[A-Za-z]{2,}){3,}/);
+  if (proseStart?.index !== undefined) {
+    return value.slice(0, proseStart.index).trim();
+  }
+  return value.trim();
+}
 
 /** Value is always the LAST capture group (label patterns may contain their own groups). */
 function searchAfterLabel(text: string, labelPattern: RegExp): { value: string; evidence: string } | null {
@@ -173,7 +186,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (regNo) {
     fields.institution_registration_number = {
-      value: regNo.value.slice(0, 60),
+      value: trimProse(regNo.value).slice(0, 60),
       confidence: regNo.labeled ? 0.75 : base,
       evidence: regNo.evidence,
     };
@@ -185,7 +198,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (refNo) {
     fields.application_reference_number = {
-      value: refNo.value.slice(0, 60),
+      value: trimProse(refNo.value).slice(0, 60),
       confidence: refNo.labeled ? 0.75 : base,
       evidence: refNo.evidence,
     };
@@ -243,7 +256,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (certNo) {
     fields.certificate_number = {
-      value: certNo.value.slice(0, 60),
+      value: trimProse(certNo.value).slice(0, 60),
       confidence: certNo.labeled ? 0.75 : base,
       evidence: certNo.evidence,
     };

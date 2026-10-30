@@ -13,6 +13,14 @@ import { CONFIG } from "@/lib/constants";
  * any external AI service.
  */
 
+/** Deterministic PDF structural metadata captured for anomaly checks. */
+export interface PdfMetadata {
+  producer: string | null;
+  createdAt: string | null;
+  modifiedAt: string | null;
+  encrypted: boolean;
+}
+
 export interface ExtractionResult {
   ok: boolean;
   text: string;
@@ -23,6 +31,8 @@ export interface ExtractionResult {
   confidence: number | null;
   error: string | null;
   needsReview: boolean;
+  /** Structural metadata of PDFs (null for images). */
+  metadata: PdfMetadata | null;
 }
 
 export function isSupportedFile(file: File): boolean {
@@ -55,6 +65,31 @@ async function ocrBlob(blob: Blob): Promise<{ text: string; confidence: number |
   }
 }
 
+/** Reads deterministic PDF metadata (producer, dates, encryption) defensively. */
+async function readPdfMetadata(
+  doc: { getMetadata: () => Promise<unknown>; isEncrypted?: boolean },
+): Promise<PdfMetadata> {
+  const meta: PdfMetadata = {
+    producer: null,
+    createdAt: null,
+    modifiedAt: null,
+    encrypted: Boolean(doc.isEncrypted),
+  };
+  try {
+    const raw = (await doc.getMetadata()) as {
+      info?: Record<string, unknown>;
+    } | null;
+    const info = raw?.info ?? {};
+    if (typeof info["Producer"] === "string") meta.producer = info["Producer"].slice(0, 120);
+    if (typeof info["Creator"] === "string" && !meta.producer) meta.producer = info["Creator"].slice(0, 120);
+    if (typeof info["CreationDate"] === "string") meta.createdAt = info["CreationDate"].slice(0, 60);
+    if (typeof info["ModDate"] === "string") meta.modifiedAt = info["ModDate"].slice(0, 60);
+  } catch {
+    // Metadata unavailable — callers treat this as a low-severity review note.
+  }
+  return meta;
+}
+
 /** Extracts text from a PDF via pdfjs; falls back to page-by-page OCR for scans. */
 async function extractPdf(
   file: File,
@@ -66,6 +101,7 @@ async function extractPdf(
 
   const buffer = await file.arrayBuffer();
   const doc = await pdfjs.getDocument({ data: buffer }).promise;
+  const metadata = await readPdfMetadata(doc as never);
   const totalPages = doc.numPages;
   const pagesToProcess = Math.min(totalPages, CONFIG.maxOcrPages);
 
@@ -93,6 +129,7 @@ async function extractPdf(
       confidence: 0.95,
       error: null,
       needsReview: false,
+      metadata,
     };
   }
 
@@ -133,6 +170,7 @@ async function extractPdf(
       ? null
       : "No readable text could be extracted from this scanned PDF.",
     needsReview: !ok || (confidence !== null && confidence < CONFIG.lowConfidenceThreshold),
+    metadata,
   };
 }
 
@@ -154,6 +192,7 @@ async function extractImage(
     confidence,
     error: ok ? null : "No readable text could be recognized in this image.",
     needsReview: !ok || (confidence !== null && confidence < CONFIG.lowConfidenceThreshold),
+    metadata: null,
   };
 }
 
@@ -179,6 +218,7 @@ export async function extractDocumentText(
       confidence: null,
       error: "Unsupported file type. Upload a PDF, JPG or PNG document.",
       needsReview: true,
+      metadata: null,
     };
   } catch (error) {
     console.error("Extraction failed", error);
@@ -194,6 +234,7 @@ export async function extractDocumentText(
         (error instanceof Error ? error.message : "unknown error") +
         ")",
       needsReview: true,
+      metadata: null,
     };
   }
 }
