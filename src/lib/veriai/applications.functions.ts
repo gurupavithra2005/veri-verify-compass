@@ -170,6 +170,15 @@ export const submitApplication = createServerFn({ method: "POST" })
     if (updateError) {
       throw new Error("Submission failed: " + updateError.message);
     }
+    await logAuditEvent({
+      applicationId: data.applicationId,
+      actorId: context.userId,
+      actionType: "application_submitted",
+      entityType: "application",
+      entityId: data.applicationId,
+      previousValue: "draft",
+      newValue: "submitted",
+    });
     return { ok: true as const };
   });
 
@@ -323,6 +332,17 @@ export const assignReviewer = createServerFn({ method: "POST" })
       .select("application_number, application_title")
       .eq("id", data.applicationId)
       .single();
+
+    await logAuditEvent({
+      applicationId: data.applicationId,
+      actorId: context.userId,
+      actorRole: "admin",
+      actionType: "reviewer_assigned",
+      entityType: "application",
+      entityId: data.applicationId,
+      newValue: data.reviewerId,
+    });
+
     await notifyUsers([data.reviewerId], {
       applicationId: data.applicationId,
       title: "Application assigned for review",
