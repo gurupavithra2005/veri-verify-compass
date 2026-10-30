@@ -9,8 +9,11 @@ export const CONFIG = {
     "image/jpeg",
     "image/jpg",
     "image/png",
+    // Infrastructure-evidence uploads (stored privately, never text-extracted).
+    "video/mp4",
+    "video/webm",
   ] as string[],
-  allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png"] as string[],
+  allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".mp4", ".webm"] as string[],
   /** Configurable page limit for OCR/extraction on long PDFs. */
   maxOcrPages: 25,
   /** Extraction confidence below this marks a field as needing review. */
