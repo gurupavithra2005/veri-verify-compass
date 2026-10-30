@@ -21,6 +21,14 @@ export const CONFIG = {
   storageBucket: "application-documents",
 };
 
+/**
+ * Version of the configured prototype rule set. Recorded on every verification
+ * run (verification_runs.rules_version) so historical results remain
+ * understandable. This is a prototype configuration version, NOT an official
+ * regulatory rule version.
+ */
+export const RULE_SET_VERSION = "veriai-proto-rules-1.1.0";
+
 export const REQUIRED_APPLICATION_FIELDS: {
   key: string;
   label: string;
