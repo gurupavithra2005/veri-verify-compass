@@ -152,6 +152,59 @@ export type Database = {
           },
         ]
       }
+      audit_events: {
+        Row: {
+          action_type: string
+          actor_id: string | null
+          actor_role: string | null
+          application_id: string | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string | null
+          error_message: string | null
+          id: string
+          new_value: string | null
+          outcome: string
+          previous_value: string | null
+        }
+        Insert: {
+          action_type: string
+          actor_id?: string | null
+          actor_role?: string | null
+          application_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          new_value?: string | null
+          outcome?: string
+          previous_value?: string | null
+        }
+        Update: {
+          action_type?: string
+          actor_id?: string | null
+          actor_role?: string | null
+          application_id?: string | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string | null
+          error_message?: string | null
+          id?: string
+          new_value?: string | null
+          outcome?: string
+          previous_value?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_events_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       document_requirements: {
         Row: {
           active: boolean
@@ -193,6 +246,9 @@ export type Database = {
           extracted_text: string | null
           extraction_confidence: number | null
           extraction_error: string | null
+          extraction_evidence: Json | null
+          extraction_method: string | null
+          field_corrections: Json | null
           file_name: string
           file_size: number
           id: string
@@ -215,6 +271,9 @@ export type Database = {
           extracted_text?: string | null
           extraction_confidence?: number | null
           extraction_error?: string | null
+          extraction_evidence?: Json | null
+          extraction_method?: string | null
+          field_corrections?: Json | null
           file_name: string
           file_size: number
           id?: string
@@ -237,6 +296,9 @@ export type Database = {
           extracted_text?: string | null
           extraction_confidence?: number | null
           extraction_error?: string | null
+          extraction_evidence?: Json | null
+          extraction_method?: string | null
+          field_corrections?: Json | null
           file_name?: string
           file_size?: number
           id?: string
@@ -263,6 +325,148 @@ export type Database = {
           {
             foreignKeyName: "documents_uploaded_by_fkey"
             columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      external_verifications: {
+        Row: {
+          application_id: string
+          created_at: string
+          document_id: string | null
+          executed_by: string | null
+          http_status: number | null
+          id: string
+          lookup_field: string | null
+          lookup_value: string | null
+          request_summary: string | null
+          response_summary: string | null
+          source_domain: string | null
+          source_id: string | null
+          source_name: string
+          status: string
+        }
+        Insert: {
+          application_id: string
+          created_at?: string
+          document_id?: string | null
+          executed_by?: string | null
+          http_status?: number | null
+          id?: string
+          lookup_field?: string | null
+          lookup_value?: string | null
+          request_summary?: string | null
+          response_summary?: string | null
+          source_domain?: string | null
+          source_id?: string | null
+          source_name: string
+          status?: string
+        }
+        Update: {
+          application_id?: string
+          created_at?: string
+          document_id?: string | null
+          executed_by?: string | null
+          http_status?: number | null
+          id?: string
+          lookup_field?: string | null
+          lookup_value?: string | null
+          request_summary?: string | null
+          response_summary?: string | null
+          source_domain?: string | null
+          source_id?: string | null
+          source_name?: string
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "external_verifications_application_id_fkey"
+            columns: ["application_id"]
+            isOneToOne: false
+            referencedRelation: "applications"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_verifications_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_verifications_executed_by_fkey"
+            columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "external_verifications_source_id_fkey"
+            columns: ["source_id"]
+            isOneToOne: false
+            referencedRelation: "verification_sources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      institution_records: {
+        Row: {
+          academic_year: string | null
+          active: boolean
+          created_at: string
+          details: Json | null
+          id: string
+          imported_by: string | null
+          institution_name: string
+          record_status: string
+          record_type: string
+          registration_number: string | null
+          source_reference: string | null
+          source_type: string
+          updated_at: string
+          valid_from: string | null
+          valid_until: string | null
+        }
+        Insert: {
+          academic_year?: string | null
+          active?: boolean
+          created_at?: string
+          details?: Json | null
+          id?: string
+          imported_by?: string | null
+          institution_name: string
+          record_status?: string
+          record_type?: string
+          registration_number?: string | null
+          source_reference?: string | null
+          source_type?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Update: {
+          academic_year?: string | null
+          active?: boolean
+          created_at?: string
+          details?: Json | null
+          id?: string
+          imported_by?: string | null
+          institution_name?: string
+          record_status?: string
+          record_type?: string
+          registration_number?: string | null
+          source_reference?: string | null
+          source_type?: string
+          updated_at?: string
+          valid_from?: string | null
+          valid_until?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "institution_records_imported_by_fkey"
+            columns: ["imported_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -548,6 +752,8 @@ export type Database = {
           executed_by: string | null
           findings_count: number
           id: string
+          rules_snapshot: Json | null
+          rules_version: string | null
           run_number: number
           started_at: string
           status: string
@@ -561,6 +767,8 @@ export type Database = {
           executed_by?: string | null
           findings_count?: number
           id?: string
+          rules_snapshot?: Json | null
+          rules_version?: string | null
           run_number: number
           started_at?: string
           status?: string
@@ -574,6 +782,8 @@ export type Database = {
           executed_by?: string | null
           findings_count?: number
           id?: string
+          rules_snapshot?: Json | null
+          rules_version?: string | null
           run_number?: number
           started_at?: string
           status?: string
@@ -589,6 +799,59 @@ export type Database = {
           {
             foreignKeyName: "verification_runs_executed_by_fkey"
             columns: ["executed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      verification_sources: {
+        Row: {
+          active: boolean
+          base_domain: string
+          configured: boolean
+          created_at: string
+          created_by: string | null
+          endpoint_path: string
+          id: string
+          lookup_param: string
+          name: string
+          notes: string | null
+          source_type: string
+          updated_at: string
+        }
+        Insert: {
+          active?: boolean
+          base_domain: string
+          configured?: boolean
+          created_at?: string
+          created_by?: string | null
+          endpoint_path?: string
+          id?: string
+          lookup_param?: string
+          name: string
+          notes?: string | null
+          source_type?: string
+          updated_at?: string
+        }
+        Update: {
+          active?: boolean
+          base_domain?: string
+          configured?: boolean
+          created_at?: string
+          created_by?: string | null
+          endpoint_path?: string
+          id?: string
+          lookup_param?: string
+          name?: string
+          notes?: string | null
+          source_type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "verification_sources_created_by_fkey"
+            columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
