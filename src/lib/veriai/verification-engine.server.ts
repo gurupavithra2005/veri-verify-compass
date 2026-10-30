@@ -1,7 +1,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database } from "@/integrations/supabase/types";
-import { CONFIG, REQUIRED_APPLICATION_FIELDS } from "@/lib/constants";
+import { CONFIG, REQUIRED_APPLICATION_FIELDS, RULE_SET_VERSION } from "@/lib/constants";
 import type { FindingCategory, Severity } from "@/lib/status";
+import { logAuditEvent } from "./audit.server";
+import { performAuthorizedLookup, type LookupSource } from "./external-lookup.server";
 
 /**
  * Deterministic verification engine (server-side).
@@ -20,7 +22,15 @@ export interface ExtractedFields {
   issue_date?: string;
   expiry_date?: string;
   certificate_number?: string;
+  document_type?: string;
   [key: string]: unknown;
+}
+
+export interface FieldCorrection {
+  value: string;
+  originalValue: string;
+  correctedBy: string;
+  correctedAt: string;
 }
 
 export interface FindingDraft {
@@ -62,6 +72,8 @@ interface DocRow {
   ocr_status: string;
   extraction_confidence: number | null;
   extracted_fields: ExtractedFields | null;
+  field_corrections: Record<string, FieldCorrection> | null;
+  extraction_evidence: Record<string, { value?: string; evidence?: string | null }> | null;
   sha256_hash: string | null;
 }
 
@@ -71,8 +83,49 @@ interface RequirementRow {
   required: boolean;
 }
 
+interface RegistryRow {
+  id: string;
+  institution_name: string;
+  registration_number: string | null;
+  record_type: string;
+  record_status: string;
+  academic_year: string | null;
+  valid_until: string | null;
+  source_type: string;
+}
+
+interface SourceRow extends LookupSource {
+  configured: boolean;
+  active: boolean;
+}
+
 const INCONSISTENCY_DISCLAIMER =
   "Potential Inconsistency — Manual Review Required.";
+
+/** Stable identifiers of the checks this engine version executes. */
+export const CHECK_CODES = [
+  "CHK_DOC_REQUIRED",
+  "CHK_NAME_MATCH",
+  "CHK_REF_MATCH",
+  "CHK_YEAR_MATCH",
+  "CHK_DATES",
+  "CHK_REQUIRED_FIELDS",
+  "CHK_OCR_QUALITY",
+  "CHK_DUPLICATE_FILE",
+  "CHK_CROSS_DOC",
+  "CHK_RECORD_MATCH",
+  "CHK_PDF_METADATA",
+] as const;
+
+/** Fields compared across documents for consistency (CHK_CROSS_DOC). */
+const CROSS_DOC_FIELDS: { key: string; label: string }[] = [
+  { key: "institution_name", label: "Institution Name" },
+  { key: "institution_registration_number", label: "Registration Number" },
+  { key: "application_reference_number", label: "Application Reference Number" },
+  { key: "academic_year", label: "Academic Year" },
+  { key: "certificate_number", label: "Certificate Number" },
+  { key: "document_type", label: "Document Type" },
+];
 
 function normalizeName(value: string | null | undefined): string {
   if (!value) return "";
@@ -99,10 +152,28 @@ function parseIsoDate(value: unknown): Date | null {
   return Number.isNaN(d.getTime()) ? null : d;
 }
 
+/** Prefers a human-corrected value over the raw extraction. */
 function fieldOf(doc: DocRow, key: string): string | null {
+  const correction = doc.field_corrections?.[key];
+  if (correction && typeof correction.value === "string" && correction.value.trim() !== "") {
+    return correction.value.trim();
+  }
   const v = doc.extracted_fields?.[key];
   if (typeof v !== "string" || v.trim() === "") return null;
   return v.trim();
+}
+
+/** Source passage recorded for a field (evidence), if any. */
+function evidenceOf(doc: DocRow, key: string): string | null {
+  const entry = doc.extraction_evidence?.[key];
+  if (entry && typeof entry.evidence === "string" && entry.evidence.trim() !== "") {
+    return entry.evidence.slice(0, 200);
+  }
+  return null;
+}
+
+function isCorrected(doc: DocRow, key: string): boolean {
+  return Boolean(doc.field_corrections?.[key]);
 }
 
 export async function executeVerificationRun(opts: {
@@ -144,27 +215,45 @@ export async function executeVerificationRun(opts: {
     );
   }
 
-  const [{ data: docs }, { data: requirements }, { data: lastRun }] =
-    await Promise.all([
-      userClient
-        .from("documents")
-        .select("id,file_name,document_category,ocr_status,extraction_confidence,extracted_fields,sha256_hash")
-        .eq("application_id", applicationId)
-        .eq("is_current", true),
-      userClient
-        .from("document_requirements")
-        .select("document_category,requirement_name,required")
-        .eq("active", true),
-      userClient
-        .from("verification_runs")
-        .select("run_number")
-        .eq("application_id", applicationId)
-        .order("run_number", { ascending: false })
-        .limit(1),
-    ]);
+  const [
+    { data: docs },
+    { data: requirements },
+    { data: lastRun },
+    { data: registryRows },
+    { data: configuredSources },
+  ] = await Promise.all([
+    userClient
+      .from("documents")
+      .select(
+        "id,file_name,document_category,ocr_status,extraction_confidence,extracted_fields,field_corrections,extraction_evidence,sha256_hash",
+      )
+      .eq("application_id", applicationId)
+      .eq("is_current", true),
+    userClient
+      .from("document_requirements")
+      .select("document_category,requirement_name,required")
+      .eq("active", true),
+    userClient
+      .from("verification_runs")
+      .select("run_number")
+      .eq("application_id", applicationId)
+      .order("run_number", { ascending: false })
+      .limit(1),
+    userClient
+      .from("institution_records")
+      .select("id,institution_name,registration_number,record_type,record_status,academic_year,valid_until,source_type")
+      .eq("active", true),
+    userClient
+      .from("verification_sources")
+      .select("id,name,source_type,base_domain,endpoint_path,lookup_param,configured,active")
+      .eq("active", true)
+      .eq("configured", true),
+  ]);
 
   const documents = (docs ?? []) as DocRow[];
   const reqs = (requirements ?? []) as RequirementRow[];
+  const registry = (registryRows ?? []) as RegistryRow[];
+  const sources = (configuredSources ?? []) as SourceRow[];
   const runNumber = ((lastRun?.[0]?.run_number as number | undefined) ?? 0) + 1;
 
   const { data: run, error: runError } = await userClient
@@ -174,6 +263,15 @@ export async function executeVerificationRun(opts: {
       run_number: runNumber,
       status: "running",
       executed_by: userId,
+      rules_version: RULE_SET_VERSION,
+      rules_snapshot: {
+        requirements: reqs,
+        checks: CHECK_CODES,
+        applicationCategory: application.application_category,
+        ruleSetType: "administrator-configured prototype rules (not official regulatory rules)",
+        registryRecordsAvailable: registry.length,
+        externalSourcesConfigured: sources.length,
+      },
     })
     .select("id")
     .single();
@@ -181,6 +279,15 @@ export async function executeVerificationRun(opts: {
     throw new Error("Could not start the verification run. Please try again.");
   }
   const runId = run.id as string;
+
+  await logAuditEvent({
+    applicationId,
+    actorId: userId,
+    actionType: "verification_started",
+    entityType: "verification_run",
+    entityId: runId,
+    newValue: `run #${runNumber}, rules ${RULE_SET_VERSION}`,
+  });
 
   const findings: FindingDraft[] = [];
   let checksPerformed = 0;
@@ -228,6 +335,7 @@ export async function executeVerificationRun(opts: {
       if (!docValue) continue;
       compared += 1;
       if (normalizeName(appValue) !== normalizeName(docValue)) {
+        const evidence = evidenceOf(doc, "institution_name");
         docNameFindings.push(
           finding({
             rule_code: "CHK_NAME_MATCH",
@@ -236,7 +344,12 @@ export async function executeVerificationRun(opts: {
             field_name: "Institution Name",
             application_value: appValue,
             document_value: docValue,
-            explanation: `The institution names differ between the application form and the uploaded document "${doc.file_name}". Names are compared after normalizing capitalization and extra whitespace, so harmless formatting differences are not flagged. ${INCONSISTENCY_DISCLAIMER}`,
+            explanation:
+              `The institution names differ between the application form and the uploaded document "${doc.file_name}". ` +
+              `Names are compared after normalizing capitalization and extra whitespace, so harmless formatting differences are not flagged.` +
+              (evidence ? ` Document evidence: "${evidence}".` : "") +
+              (isCorrected(doc, "institution_name") ? " The document value was human-corrected." : "") +
+              ` ${INCONSISTENCY_DISCLAIMER}`,
             recommended_action:
               "Review the original document and correct the application or replace the document if necessary.",
             document_id: doc.id,
@@ -365,7 +478,8 @@ export async function executeVerificationRun(opts: {
     const today = new Date();
     for (const doc of documents) {
       const issue = parseIsoDate(doc.extracted_fields?.issue_date);
-      const expiry = parseIsoDate(doc.extracted_fields?.expiry_date);
+      const expiryRaw = fieldOf(doc, "expiry_date");
+      const expiry = parseIsoDate(expiryRaw);
       if (expiry && issue && expiry < issue) {
         dateFindings.push(
           finding({
@@ -374,7 +488,7 @@ export async function executeVerificationRun(opts: {
             severity: "high",
             field_name: "Expiry / Issue Date",
             application_value: null,
-            document_value: `Issued ${doc.extracted_fields?.issue_date}, expires ${doc.extracted_fields?.expiry_date}`,
+            document_value: `Issued ${doc.extracted_fields?.issue_date}, expires ${expiryRaw}`,
             explanation: `On "${doc.file_name}" the expiry date is earlier than the issue date, which is inconsistent. ${INCONSISTENCY_DISCLAIMER}`,
             recommended_action:
               "Review the dates on the original document and upload a corrected document if needed.",
@@ -389,7 +503,7 @@ export async function executeVerificationRun(opts: {
             severity: "high",
             field_name: "Expiry Date",
             application_value: null,
-            document_value: doc.extracted_fields?.expiry_date as string,
+            document_value: expiryRaw,
             explanation: `The expiry date extracted from "${doc.file_name}" is in the past. ${INCONSISTENCY_DISCLAIMER}`,
             recommended_action:
               "Upload a currently valid document or explain the expiry during manual review.",
@@ -456,7 +570,7 @@ export async function executeVerificationRun(opts: {
             field_name: "Document Text Extraction",
             application_value: null,
             document_value: null,
-            explanation: `Text extraction failed for "${doc.file_name}". The document could not be processed automatically.`,
+            explanation: `Text extraction failed for "${doc.file_name}". The document could not be processed automatically. This is a processing failure, NOT a confirmed mismatch.`,
             recommended_action:
               "Retry extraction with a clearer scan, upload a better-quality copy, or inspect the document manually.",
             document_id: doc.id,
@@ -522,6 +636,233 @@ export async function executeVerificationRun(opts: {
     recordCheck(dupFindings);
   }
 
+  // ---- CHECK 9: Cross-Document Consistency ----------------------------------
+  {
+    const crossFindings: FindingDraft[] = [];
+    for (const { key, label } of CROSS_DOC_FIELDS) {
+      const perDoc: { doc: DocRow; value: string }[] = [];
+      for (const doc of documents) {
+        const value = fieldOf(doc, key);
+        if (value) perDoc.push({ doc, value });
+      }
+      if (perDoc.length < 2) continue;
+      const distinct = new Map<string, { doc: DocRow; value: string }>();
+      for (const entry of perDoc) {
+        const norm = key === "institution_name" ? normalizeName(entry.value) : normalizeRef(entry.value);
+        if (!distinct.has(norm)) distinct.set(norm, entry);
+      }
+      if (distinct.size > 1) {
+        const first = perDoc[0];
+        const others = perDoc.slice(1);
+        const evidence = evidenceOf(first.doc, key) ?? evidenceOf(others[0].doc, key);
+        crossFindings.push(
+          finding({
+            rule_code: "CHK_CROSS_DOC",
+            category: "information_mismatch",
+            severity: "medium",
+            field_name: label,
+            application_value: null,
+            document_value: others.map((o) => o.value).join(" | "),
+            explanation:
+              `Documents in this application state different values for "${label}": ` +
+              `"${first.doc.file_name}" shows "${first.value}", while ` +
+              others.map((o) => `"${o.doc.file_name}" shows "${o.value}"`).join("; ") +
+              ". " +
+              (evidence ? `Document evidence: "${evidence}". ` : "") +
+              `Conflicting values across submitted documents require manual comparison with the originals. ${INCONSISTENCY_DISCLAIMER}`,
+            recommended_action:
+              "Compare the original documents and correct whichever document or application entry is wrong.",
+            document_id: first.doc.id,
+          }),
+        );
+      }
+    }
+    recordCheck(crossFindings);
+  }
+
+  // ---- CHECK 10: Institutional Records Registry Comparison ------------------
+  {
+    const recordFindings: FindingDraft[] = [];
+    const appReg = normalizeRef(application.institution_registration_number);
+    const appName = normalizeName(application.institution_name);
+    let matched: RegistryRow | null = null;
+    for (const record of registry) {
+      const regMatch =
+        appReg !== "" &&
+        record.registration_number !== null &&
+        normalizeRef(record.registration_number) === appReg;
+      const nameMatch =
+        appName !== "" && normalizeName(record.institution_name) === appName;
+      if (regMatch || nameMatch) {
+        matched = record;
+        break;
+      }
+    }
+    if (matched) {
+      const provenanceNote =
+        matched.source_type === "synthetic_demo"
+          ? " The matched registry record is clearly-labelled synthetic demonstration data, not an official government record."
+          : "";
+      if (
+        normalizeName(matched.institution_name) !== appName &&
+        appName !== ""
+      ) {
+        recordFindings.push(
+          finding({
+            rule_code: "CHK_RECORD_MATCH",
+            category: "information_mismatch",
+            severity: "medium",
+            field_name: "Institution Name (registry)",
+            application_value: application.institution_name,
+            document_value: matched.institution_name,
+            explanation:
+              `The application institution name differs from the institutional record "${matched.record_type}" available to this system.` +
+              provenanceNote +
+              ` ${INCONSISTENCY_DISCLAIMER}`,
+            recommended_action:
+              "Verify the institution name against the registry record and the original documents.",
+          }),
+        );
+      }
+      if (
+        appReg !== "" &&
+        matched.registration_number !== null &&
+        normalizeRef(matched.registration_number) !== appReg
+      ) {
+        recordFindings.push(
+          finding({
+            rule_code: "CHK_RECORD_MATCH",
+            category: "information_mismatch",
+            severity: "medium",
+            field_name: "Registration Number (registry)",
+            application_value: application.institution_registration_number,
+            document_value: matched.registration_number,
+            explanation:
+              "The application registration number differs from the registration number in the matched institutional record." +
+              provenanceNote +
+              ` ${INCONSISTENCY_DISCLAIMER}`,
+            recommended_action:
+              "Confirm the registration number against the registry record and the original documents.",
+          }),
+        );
+      }
+      if (matched.valid_until) {
+        const validUntil = parseIsoDate(matched.valid_until);
+        if (validUntil && validUntil < new Date()) {
+          recordFindings.push(
+            finding({
+              rule_code: "CHK_RECORD_MATCH",
+              category: "date_inconsistency",
+              severity: "high",
+              field_name: "Registry Record Validity",
+              application_value: null,
+              document_value: matched.valid_until,
+              explanation:
+                `The matched institutional record shows a validity end date of ${matched.valid_until}, which has passed.` +
+                provenanceNote +
+                ` ${INCONSISTENCY_DISCLAIMER}`,
+              recommended_action:
+                "Review whether a renewed record exists, or confirm the current status during manual review.",
+            }),
+          );
+        }
+      }
+    }
+    recordCheck(recordFindings);
+  }
+
+  // ---- CHECK 11: PDF Structural Metadata (anomaly indicators) ----------------
+  {
+    const metaFindings: FindingDraft[] = [];
+    for (const doc of documents) {
+      const metadata = doc.extraction_evidence?.["_document_metadata"] as
+        | { producer?: string | null; createdAt?: string | null; modifiedAt?: string | null; encrypted?: boolean }
+        | undefined;
+      if (!metadata) continue; // images and not-yet-processed documents carry no metadata
+      if (metadata.encrypted) {
+        metaFindings.push(
+          finding({
+            rule_code: "CHK_PDF_METADATA",
+            category: "metadata_anomaly",
+            severity: "medium",
+            field_name: "PDF Encryption",
+            application_value: null,
+            document_value: "encrypted",
+            explanation:
+              `The PDF "${doc.file_name}" reports itself as encrypted. Encryption is not proof of wrongdoing, but it can prevent complete inspection, so the document should be reviewed manually.`,
+            recommended_action:
+              "Request an unencrypted copy of the document for manual inspection.",
+            document_id: doc.id,
+          }),
+        );
+      } else if (!metadata.producer && !metadata.createdAt) {
+        metaFindings.push(
+          finding({
+            rule_code: "CHK_PDF_METADATA",
+            category: "metadata_anomaly",
+            severity: "low",
+            field_name: "PDF Metadata",
+            application_value: null,
+            document_value: "not available",
+            explanation:
+              `No structural metadata could be read from the PDF "${doc.file_name}". This is an observation for manual review, not evidence of tampering.`,
+            recommended_action:
+              "Note the missing metadata during manual review of the original document.",
+            document_id: doc.id,
+          }),
+        );
+      }
+    }
+    recordCheck(metaFindings);
+  }
+
+  // ---- External authorized-source verification attempts ---------------------
+  // Every attempt — including the explicit "Not Configured" state — is recorded
+  // as evidence. No fabricated successful verification is ever produced.
+  try {
+    if (sources.length === 0) {
+      await userClient.from("external_verifications").insert({
+        application_id: applicationId,
+        source_name: "No authorized source configured",
+        status: "not_configured",
+        request_summary:
+          "Automated verification with the original issuing authority was not attempted because no authorized external source has been configured by an administrator.",
+        response_summary: null,
+        executed_by: userId,
+      });
+    } else {
+      for (const doc of documents) {
+        const lookupValue =
+          fieldOf(doc, "institution_registration_number") ??
+          fieldOf(doc, "application_reference_number");
+        if (!lookupValue) continue;
+        const source = sources[0];
+        const outcome = await performAuthorizedLookup(
+          source,
+          "registration_or_reference_number",
+          lookupValue,
+        );
+        await userClient.from("external_verifications").insert({
+          application_id: applicationId,
+          document_id: doc.id,
+          source_id: source.id,
+          source_name: source.name,
+          source_domain: source.base_domain,
+          lookup_field: "registration_or_reference_number",
+          lookup_value: lookupValue,
+          status: outcome.status,
+          request_summary: outcome.requestSummary,
+          response_summary: outcome.responseSummary,
+          http_status: outcome.httpStatus,
+          executed_by: userId,
+        });
+      }
+    }
+  } catch (externalError) {
+    // Recording the external attempt must never fail the whole run.
+    console.error("External verification recording failed", externalError);
+  }
+
   const findingsCount = findings.length;
 
   // Persist findings for this run.
@@ -554,19 +895,15 @@ export async function executeVerificationRun(opts: {
   }
 
   // Mark per-document verification status based on this run's findings.
-  const docsById = new Map(documents.map((d) => [d.id, d]));
   const docHasFinding = new Set(
     findings.map((f) => f.document_id).filter((id): id is string => id !== null),
   );
   for (const doc of documents) {
-    const docFindings = findings.filter((f) => f.document_id === doc.id);
     const status = docHasFinding.has(doc.id) ? "issues" : "passed";
     await userClient
       .from("documents")
       .update({ verification_status: status })
       .eq("id", doc.id);
-    void docFindings;
-    void docsById;
   }
 
   // Route the application. Automated results never approve or reject.
@@ -624,6 +961,15 @@ export async function executeVerificationRun(opts: {
   if (completeError) {
     throw new Error("Verification run could not be finalized: " + completeError.message);
   }
+
+  await logAuditEvent({
+    applicationId,
+    actorId: userId,
+    actionType: "verification_completed",
+    entityType: "verification_run",
+    entityId: runId,
+    newValue: `run #${runNumber}: ${checksPerformed} checks, ${checksPassed} passed, ${findingsCount} finding(s), routed to ${routedStatus ?? "no status change"}`,
+  });
 
   return {
     runId,

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { REQUIRED_APPLICATION_FIELDS } from "@/lib/constants";
 import { notifyUsers } from "./notifications.server";
+import { logAuditEvent } from "./audit.server";
 
 const applicationInputSchema = z.object({
   institution_name: z.string().min(1),
@@ -60,6 +61,14 @@ export const createApplication = createServerFn({ method: "POST" })
       .select("id, application_number")
       .single();
     if (error) throw new Error("Could not save the application: " + error.message);
+    await logAuditEvent({
+      applicationId: created.id,
+      actorId: context.userId,
+      actionType: "application_created",
+      entityType: "application",
+      entityId: created.id,
+      newValue: `draft ${created.application_number}`,
+    });
     return created;
   });
 
@@ -161,6 +170,15 @@ export const submitApplication = createServerFn({ method: "POST" })
     if (updateError) {
       throw new Error("Submission failed: " + updateError.message);
     }
+    await logAuditEvent({
+      applicationId: data.applicationId,
+      actorId: context.userId,
+      actionType: "application_submitted",
+      entityType: "application",
+      entityId: data.applicationId,
+      previousValue: "draft",
+      newValue: "submitted",
+    });
     return { ok: true as const };
   });
 
@@ -314,6 +332,17 @@ export const assignReviewer = createServerFn({ method: "POST" })
       .select("application_number, application_title")
       .eq("id", data.applicationId)
       .single();
+
+    await logAuditEvent({
+      applicationId: data.applicationId,
+      actorId: context.userId,
+      actorRole: "admin",
+      actionType: "reviewer_assigned",
+      entityType: "application",
+      entityId: data.applicationId,
+      newValue: data.reviewerId,
+    });
+
     await notifyUsers([data.reviewerId], {
       applicationId: data.applicationId,
       title: "Application assigned for review",

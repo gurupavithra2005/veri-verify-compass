@@ -9,14 +9,25 @@ export const CONFIG = {
     "image/jpeg",
     "image/jpg",
     "image/png",
+    // Infrastructure-evidence uploads (stored privately, never text-extracted).
+    "video/mp4",
+    "video/webm",
   ] as string[],
-  allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png"] as string[],
+  allowedExtensions: [".pdf", ".jpg", ".jpeg", ".png", ".mp4", ".webm"] as string[],
   /** Configurable page limit for OCR/extraction on long PDFs. */
   maxOcrPages: 25,
   /** Extraction confidence below this marks a field as needing review. */
   lowConfidenceThreshold: 0.6,
   storageBucket: "application-documents",
 };
+
+/**
+ * Version of the configured prototype rule set. Recorded on every verification
+ * run (verification_runs.rules_version) so historical results remain
+ * understandable. This is a prototype configuration version, NOT an official
+ * regulatory rule version.
+ */
+export const RULE_SET_VERSION = "veriai-proto-rules-1.1.0";
 
 export const REQUIRED_APPLICATION_FIELDS: {
   key: string;
