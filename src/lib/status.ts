@@ -49,7 +49,8 @@ export type FindingCategory =
   | "information_mismatch"
   | "date_inconsistency"
   | "ocr_review_required"
-  | "duplicate_file";
+  | "duplicate_file"
+  | "metadata_anomaly";
 
 export const FINDING_CATEGORY_LABELS: Record<FindingCategory, string> = {
   missing_document: "Missing Document",
@@ -58,6 +59,7 @@ export const FINDING_CATEGORY_LABELS: Record<FindingCategory, string> = {
   date_inconsistency: "Date Inconsistency",
   ocr_review_required: "OCR Review Required",
   duplicate_file: "Duplicate File",
+  metadata_anomaly: "Metadata Anomaly",
 };
 
 export type Severity = "low" | "medium" | "high";
