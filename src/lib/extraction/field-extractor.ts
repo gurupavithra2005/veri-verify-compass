@@ -256,7 +256,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (certNo) {
     fields.certificate_number = {
-      value: certNo.value.slice(0, 60),
+      value: trimProse(certNo.value).slice(0, 60),
       confidence: certNo.labeled ? 0.75 : base,
       evidence: certNo.evidence,
     };
