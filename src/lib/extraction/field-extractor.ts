@@ -186,7 +186,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (regNo) {
     fields.institution_registration_number = {
-      value: regNo.value.slice(0, 60),
+      value: trimProse(regNo.value).slice(0, 60),
       confidence: regNo.labeled ? 0.75 : base,
       evidence: regNo.evidence,
     };
@@ -198,7 +198,7 @@ export function extractFields(text: string, method?: ExtractionMethod): Extracte
   ]);
   if (refNo) {
     fields.application_reference_number = {
-      value: refNo.value.slice(0, 60),
+      value: trimProse(refNo.value).slice(0, 60),
       confidence: refNo.labeled ? 0.75 : base,
       evidence: refNo.evidence,
     };
